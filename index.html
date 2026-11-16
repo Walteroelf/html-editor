@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="HTML-Editor mit Live-Vorschau, Speichern und Drucken. Alles bleibt auf dem Gerät.">
+<title>HTML-Editor</title>
+<style>
+  /* Gestaltung wie die anderen Unterrichts-Apps: Erscheinungsbild der Spiele 1972 (Otl Aicher).
+     Helle, heitere Farben, flache Flächen, kleine Rundungen, kein Rot und kein Schwarz (Schrift in Dunkelblau). */
+  @font-face{ font-family:"Andika"; font-weight:400; font-display:swap; src:url("schriften/andika-400.woff2") format("woff2"); }
+  @font-face{ font-family:"Andika"; font-weight:700; font-display:swap; src:url("schriften/andika-700.woff2") format("woff2"); }
+
+  :root {
+    color-scheme: light;
+    --blau:#3d9ad6; --hellblau:#9fd3f0; --gruen:#2f9e55; --gelb:#ffd200; --orange:#f39325; --silber:#c5ccd3;
+    --bg:#f5f7f9; --panel:#ffffff; --panel2:#eef1f4; --line:#c5ccd3; --rand:#1d3a5c;
+    --text:#1d3a5c; --muted:#5b7491;
+    --accent:#1f6fae; --on-accent:#ffffff; --radius:6px;
+    --tag:#1e7f4a; --attr:#1f6fae; --val:#c76f0a; --comment:#5b7491; --doctype:#1d3a5c;
+    --sel:rgba(61,154,214,.3); --caret:#1d3a5c;
+    --schrift:"Andika",system-ui,sans-serif;
+    --anzeige:"Helvetica Neue",Helvetica,Arial,system-ui,sans-serif;
+    --mono:Consolas,Menlo,"Courier New",monospace;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg:#121c27; --panel:#1b2735; --panel2:#243345; --line:#3d5168; --rand:#9fb3c8;
+    --text:#e8f0f7; --muted:#9fb3c8;
+    --accent:#6bb8ea; --on-accent:#0f2133;
+    --tag:#45b86b; --attr:#6bb8ea; --val:#f3a24a; --comment:#9fb3c8; --doctype:#ffd200;
+    --sel:rgba(107,184,234,.35); --caret:#e8f0f7;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; flex-direction: column; font: 16px/1.4 var(--schrift); background: var(--bg); color: var(--text); overscroll-behavior: none; }
+
+  .band { display: flex; height: 12px; flex: none; }
+  .band i { flex: 1; }
+  .band i:nth-child(1){ background:var(--blau); } .band i:nth-child(2){ background:var(--hellblau); }
+  .band i:nth-child(3){ background:var(--gruen); } .band i:nth-child(4){ background:var(--gelb); }
+  .band i:nth-child(5){ background:var(--orange); } .band i:nth-child(6){ background:var(--silber); }
+
+  header { padding: 10px 16px; background: var(--panel); border-bottom: 3px solid var(--rand); display: flex;
+    justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  h1 { margin: 0 6px 0 0; font: 800 22px/1.15 var(--anzeige); }
+  .gruppe { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  header label { font-size: 14px; color: var(--muted); }
+  header input[type=text], header select { font: inherit; font-size: 15px; padding: 6px 10px; min-height: 40px;
+    border: 3px solid var(--rand); border-radius: var(--radius); background: var(--panel); color: var(--text); }
+  header input[type=text] { width: 170px; }
+  header input::placeholder { color: var(--muted); }
+  .btn { font: inherit; font-weight: 700; font-size: 15px; padding: 6px 14px; min-height: 40px; cursor: pointer;
+    background: var(--panel); color: var(--text); border: 3px solid var(--rand); border-radius: var(--radius); }
+  .btn:active { transform: translateY(2px); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  header :focus-visible, #trenner:focus-visible { outline: 4px solid var(--hellblau); outline-offset: 2px; }
+
+  main { flex: 1; display: flex; min-height: 0; position: relative; }
+  #editor { flex: 0 0 50%; display: flex; min-width: 80px; min-height: 80px; background: var(--panel); }
+  #zeilen { flex: none; min-width: 3.2em; padding: 12px 8px 12px 0; text-align: right; overflow: hidden;
+    background: var(--panel2); color: var(--muted); border-right: 2px solid var(--line);
+    font: 14px/1.5 var(--mono); white-space: pre; user-select: none; }
+  #feld { flex: 1; position: relative; min-width: 0; }
+  #feld pre, #feld textarea {
+    position: absolute; inset: 0; margin: 0; padding: 12px; border: 0; width: 100%; height: 100%;
+    font: 14px/1.5 var(--mono); tab-size: 2; white-space: pre; overflow: auto; letter-spacing: 0; word-spacing: 0; }
+  #feld pre { color: var(--text); pointer-events: none; overflow: hidden; }
+  #feld textarea { background: transparent; color: transparent; caret-color: var(--caret);
+    resize: none; outline: none; -webkit-text-fill-color: transparent; }
+  #feld textarea::selection { background: var(--sel); -webkit-text-fill-color: transparent; }
+  #feld textarea::placeholder { color: var(--muted); -webkit-text-fill-color: var(--muted); }
+  .t { color: var(--tag); } .a { color: var(--attr); } .v { color: var(--val); }
+  .c { color: var(--comment); font-style: italic; } .d { color: var(--doctype); font-weight: 700; }
+
+  #trenner { flex: none; width: 12px; background: var(--rand); cursor: col-resize; touch-action: none; position: relative; }
+  #trenner::after { content: ""; position: absolute; left: 4px; right: 4px; top: 50%; height: 40px; margin-top: -20px;
+    border-left: 2px solid var(--panel); border-right: 2px solid var(--panel); }
+  #trenner:hover, #trenner.aktiv { background: var(--accent); }
+  #vorschau { flex: 1; min-width: 80px; min-height: 80px; border: 0; background: #fff; }
+  main.ziehen iframe { pointer-events: none; }
+
+  #drop { display: none; position: absolute; inset: 0; z-index: 5; background: rgba(29,58,92,.9); color: #fff;
+    font: 800 24px var(--anzeige); align-items: center; justify-content: center; pointer-events: none;
+    border: 6px dashed var(--gelb); }
+  main.drag #drop { display: flex; }
+
+  @media (max-width: 700px) {
+    main { flex-direction: column; }
+    #trenner { width: auto; height: 12px; cursor: row-resize; }
+    #trenner::after { left: 50%; right: auto; top: 4px; bottom: 4px; height: auto; width: 40px; margin: 0 0 0 -20px;
+      border: 0; border-top: 2px solid var(--panel); border-bottom: 2px solid var(--panel); }
+  }
+  @media print {
+    .band, header, #editor, #trenner { display: none; }
+    main { display: block; }
+    #vorschau { width: 100%; height: 100vh; }
+  }
+</style>
+</head>
+<body>
+<div class="band" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+<header>
+  <div class="gruppe">
+    <h1>HTML-Editor</h1>
+    <button class="btn" id="btnOeffnen" title="HTML-Datei laden">Öffnen</button>
+    <button class="btn" id="btnLeeren">Leeren</button>
+    <button class="btn" id="btnTheme" title="Hell/Dunkel umschalten">🌙 Dunkel</button>
+    <input type="file" id="datei" accept=".html,.htm,text/html,text/plain" hidden>
+  </div>
+  <div class="gruppe">
+    <label for="rand">Druckrand:</label>
+    <select id="rand">
+      <option value="10">10 mm</option><option value="15">15 mm</option>
+      <option value="20" selected>20 mm</option><option value="25">25 mm</option><option value="30">30 mm</option>
+    </select>
+    <select id="ausrichtung" aria-label="Ausrichtung">
+      <option value="portrait" selected>A4 hoch</option><option value="landscape">A4 quer</option>
+    </select>
+    <input type="text" id="dateiname" placeholder="Dateiname (optional)">
+    <button class="btn primary" id="btnSpeichern">Speichern</button>
+    <button class="btn" id="btnDrucken">Drucken</button>
+  </div>
+</header>
+
+<main id="main">
+  <div id="editor">
+    <div id="zeilen" aria-hidden="true">1</div>
+    <div id="feld">
+      <pre id="hl" aria-hidden="true"></pre>
+      <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off"
+        placeholder="Hier HTML-Code einfügen oder eine Datei hierher ziehen …"></textarea>
+    </div>
+  </div>
+  <div id="trenner" role="separator" aria-orientation="vertical" tabindex="0" title="Ziehen zum Verschieben"></div>
+  <iframe id="vorschau" title="Vorschau" sandbox="allow-scripts allow-forms allow-modals allow-same-origin"></iframe>
+  <div id="drop">HTML-Datei hier ablegen</div>
+</main>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const code = $('code'), hl = $('hl'), zeilen = $('zeilen'), vorschau = $('vorschau');
+  const main = $('main'), editor = $('editor'), trenner = $('trenner');
+  const rand = $('rand'), ausrichtung = $('ausrichtung'), dateiname = $('dateiname');
+  const root = document.documentElement;
+
+  // ---------- Speicher (localStorage, fehlertolerant) ----------
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+
+  // ---------- Syntax-Highlighting ----------
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  function attrs(s) {
+    let out = '', last = 0, m;
+    const re = /([^\s"'<>\/=]+)(\s*=\s*)?("[^"]*"?|'[^']*'?|[^\s"'>]+)?/g;
+    while ((m = re.exec(s)) !== null) {
+      if (m[0] === '') { re.lastIndex++; continue; }
+      out += esc(s.slice(last, m.index)) + '<span class="a">' + esc(m[1]) + '</span>';
+      if (m[2]) out += esc(m[2]);
+      if (m[3]) out += '<span class="v">' + esc(m[3]) + '</span>';
+      last = m.index + m[0].length;
+    }
+    return out + esc(s.slice(last));
+  }
+
+  function highlight(src) {
+    const re = /<!--[\s\S]*?(?:-->|$)|<![^>]*>?|<\/?[a-zA-Z][^>]*>?|[^<]+|</g;
+    return src.replace(re, tok => {
+      if (tok.startsWith('<!--')) return '<span class="c">' + esc(tok) + '</span>';
+      if (tok.startsWith('<!')) return '<span class="d">' + esc(tok) + '</span>';
+      const m = /^(<\/?)([^\s\/>]+)([\s\S]*?)(\/?>?)$/.exec(tok);
+      if (m) return '<span class="t">' + esc(m[1] + m[2]) + '</span>' + attrs(m[3]) + '<span class="t">' + esc(m[4]) + '</span>';
+      return esc(tok);
+    });
+  }
+
+  let letzteZeilen = 0;
+  function render() {
+    hl.innerHTML = highlight(code.value) + '\n';
+    const n = code.value.split('\n').length;
+    if (n !== letzteZeilen) {
+      let t = ''; for (let i = 1; i <= n; i++) t += i + '\n';
+      zeilen.textContent = t.slice(0, -1);
+      letzteZeilen = n;
+    }
+    syncScroll();
+  }
+  function syncScroll() {
+    hl.scrollTop = code.scrollTop; hl.scrollLeft = code.scrollLeft;
+    zeilen.scrollTop = code.scrollTop;
+  }
+
+  // ---------- Vorschau ----------
+  let timer;
+  function vorschauAktualisieren() { vorschau.srcdoc = code.value; }
+  function geaendert() {
+    render();
+    store.set('html-editor:code', code.value);
+    clearTimeout(timer); timer = setTimeout(vorschauAktualisieren, 150);
+  }
+  code.addEventListener('input', geaendert);
+  code.addEventListener('scroll', syncScroll);
+
+  // Tab-Taste fügt Einrückung ein
+  code.addEventListener('keydown', e => {
+    if (e.key === 'Tab' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      code.setRangeText('  ', code.selectionStart, code.selectionEnd, 'end');
+      geaendert();
+    }
+  });
+
+  // ---------- Buttons ----------
+  $('btnLeeren').onclick = () => {
+    if (code.value && !confirm('Editor wirklich leeren?')) return;
+    code.value = ''; geaendert(); vorschauAktualisieren();
+  };
+
+  $('btnDrucken').onclick = () => {
+    if (!code.value.trim()) { alert('Es gibt noch nichts zu drucken. Bitte zuerst HTML-Code einfügen.'); return; }
+    vorschauAktualisieren();
+    const doc = vorschau.contentDocument, win = vorschau.contentWindow;
+    const style = doc.createElement('style');
+    style.textContent = '@page { size: A4 ' + ausrichtung.value + '; margin: ' + rand.value + 'mm; }';
+    doc.head.appendChild(style);
+    win.addEventListener('afterprint', () => style.remove(), { once: true });
+    win.focus(); win.print();
+  };
+
+  $('btnSpeichern').onclick = () => {
+    if (!code.value.trim()) { alert('Es gibt noch nichts zu speichern. Bitte zuerst HTML-Code einfügen.'); return; }
+    let name = dateiname.value.trim().replace(/[\\/:*?"<>|]/g, '_') || 'meine-seite';
+    if (!/\.html?$/i.test(name)) name += '.html';
+    const url = URL.createObjectURL(new Blob([code.value], { type: 'text/html;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  [rand, ausrichtung, dateiname].forEach(el => {
+    const k = 'html-editor:' + el.id;
+    const v = store.get(k); if (v !== null) el.value = v;
+    el.addEventListener('input', () => store.set(k, el.value));
+  });
+
+  // ---------- Datei laden ----------
+  function dateiLaden(f) {
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      code.value = String(r.result); geaendert(); vorschauAktualisieren();
+      dateiname.value = f.name.replace(/\.html?$/i, ''); store.set('html-editor:dateiname', dateiname.value);
+    };
+    r.readAsText(f);
+  }
+  $('btnOeffnen').onclick = () => $('datei').click();
+  $('datei').onchange = e => { dateiLaden(e.target.files[0]); e.target.value = ''; };
+
+  let dragZaehler = 0;
+  const hatDatei = e => e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+  window.addEventListener('dragenter', e => { if (hatDatei(e)) { e.preventDefault(); dragZaehler++; main.classList.add('drag'); } });
+  window.addEventListener('dragleave', e => { if (hatDatei(e) && --dragZaehler <= 0) { dragZaehler = 0; main.classList.remove('drag'); } });
+  window.addEventListener('dragover', e => { if (hatDatei(e)) e.preventDefault(); });
+  window.addEventListener('drop', e => {
+    if (!hatDatei(e)) return;
+    e.preventDefault(); dragZaehler = 0; main.classList.remove('drag');
+    dateiLaden(e.dataTransfer.files[0]);
+  });
+
+  // ---------- Dunkelmodus ----------
+  const btnTheme = $('btnTheme');
+  function setTheme(t, speichern) {
+    root.setAttribute('data-theme', t);
+    btnTheme.textContent = t === 'dark' ? '☀️ Hell' : '🌙 Dunkel';
+    if (speichern) store.set('html-editor:theme', t);
+  }
+  setTheme(store.get('html-editor:theme') ||
+    (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'), false);
+  btnTheme.onclick = () => setTheme(root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark', true);
+
+  // ---------- Verschiebbarer Trenner ----------
+  const vertikal = () => matchMedia('(max-width: 700px)').matches;
+  function setAnteil(p) {
+    p = Math.min(85, Math.max(15, p));
+    editor.style.flex = '0 0 ' + p + '%';
+    trenner.setAttribute('aria-valuenow', Math.round(p));
+    return p;
+  }
+  let anteil = parseFloat(store.get('html-editor:anteil'));
+  anteil = setAnteil(isNaN(anteil) ? 50 : anteil);
+
+  trenner.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    trenner.setPointerCapture(e.pointerId);
+    trenner.classList.add('aktiv'); main.classList.add('ziehen');
+  });
+  trenner.addEventListener('pointermove', e => {
+    if (!trenner.hasPointerCapture(e.pointerId)) return;
+    const r = main.getBoundingClientRect();
+    anteil = setAnteil(vertikal() ? (e.clientY - r.top) / r.height * 100 : (e.clientX - r.left) / r.width * 100);
+  });
+  const ende = e => {
+    trenner.classList.remove('aktiv'); main.classList.remove('ziehen');
+    store.set('html-editor:anteil', anteil);
+  };
+  trenner.addEventListener('pointerup', ende);
+  trenner.addEventListener('pointercancel', ende);
+  trenner.addEventListener('dblclick', () => { anteil = setAnteil(50); store.set('html-editor:anteil', 50); });
+  trenner.addEventListener('keydown', e => {
+    const links = vertikal() ? 'ArrowUp' : 'ArrowLeft', rechts = vertikal() ? 'ArrowDown' : 'ArrowRight';
+    if (e.key === links || e.key === rechts) {
+      e.preventDefault();
+      anteil = setAnteil(anteil + (e.key === rechts ? 2 : -2));
+      store.set('html-editor:anteil', anteil);
+    }
+  });
+
+  // ---------- Start ----------
+  const gespeichert = store.get('html-editor:code');
+  if (gespeichert !== null) code.value = gespeichert;
+  render(); vorschauAktualisieren();
+})();
+</script>
+</body>
+</html>
