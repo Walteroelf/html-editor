@@ -79,6 +79,10 @@
   #trenner:hover, #trenner.aktiv { background: var(--accent); }
   #vorschau { flex: 1; min-width: 80px; min-height: 80px; border: 0; background: #fff; }
   main.ziehen iframe { pointer-events: none; }
+  #vorschau:fullscreen { width: 100%; height: 100%; }
+  body.vollbild #vorschau { position: fixed; inset: 0; z-index: 20; width: 100%; height: 100%; }
+  #vbEnde { display: none; position: fixed; top: 10px; right: 10px; z-index: 21; opacity: .85; }
+  body.vollbild #vbEnde { display: block; }
 
   #drop { display: none; position: absolute; inset: 0; z-index: 5; background: rgba(29,58,92,.9); color: #fff;
     font: 800 24px var(--anzeige); align-items: center; justify-content: center; pointer-events: none;
@@ -105,6 +109,8 @@
     <h1>HTML-Editor</h1>
     <button class="btn" id="btnOeffnen" title="HTML-Datei laden">Öffnen</button>
     <button class="btn" id="btnLeeren">Leeren</button>
+    <button class="btn" id="btnAnzeigen" title="Vorschau neu starten und anklicken (Strg/Cmd + Enter)">▶ Anzeigen</button>
+    <button class="btn" id="btnVollbild" title="Vorschau im Vollbild (Esc beendet)">⛶ Vollbild</button>
     <button class="btn" id="btnTheme" title="Hell/Dunkel umschalten">🌙 Dunkel</button>
     <input type="file" id="datei" accept=".html,.htm,text/html,text/plain" hidden>
   </div>
@@ -133,7 +139,8 @@
     </div>
   </div>
   <div id="trenner" role="separator" aria-orientation="vertical" tabindex="0" title="Ziehen zum Verschieben"></div>
-  <iframe id="vorschau" title="Vorschau" sandbox="allow-scripts allow-forms allow-modals allow-same-origin"></iframe>
+  <iframe id="vorschau" title="Vorschau" allow="fullscreen" allowfullscreen sandbox="allow-scripts allow-forms allow-modals allow-same-origin"></iframe>
+  <button class="btn primary" id="vbEnde" type="button">✕ Vollbild beenden</button>
   <div id="drop">HTML-Datei hier ablegen</div>
 </main>
 
@@ -197,6 +204,45 @@
   // ---------- Vorschau ----------
   let timer;
   function vorschauAktualisieren() { vorschau.srcdoc = code.value; }
+
+  // Vorschau neu laden und den Fokus hineinsetzen, damit z. B. Spiele die Tastatur sofort bekommen.
+  // (Bewusst nicht bei jeder Eingabe, sonst würde das Tippen im Editor unterbrochen.)
+  function fokusInVorschau() { try { vorschau.contentWindow.focus(); } catch (e) {} }
+  function anzeigen() {
+    vorschau.addEventListener('load', fokusInVorschau, { once: true });
+    vorschauAktualisieren();
+  }
+  $('btnAnzeigen').onclick = anzeigen;
+  code.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); anzeigen(); }
+  });
+
+  // Vollbild: echte Fullscreen-API, sonst Behelfs-Vollbild über die ganze Seite
+  const vbEnde = $('vbEnde');
+  const nativ = vorschau.requestFullscreen || vorschau.webkitRequestFullscreen;
+  const imVollbild = () => document.fullscreenElement === vorschau || document.webkitFullscreenElement === vorschau || document.body.classList.contains('vollbild');
+  function vollbildEnde() {
+    document.body.classList.remove('vollbild');
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (document.webkitFullscreenElement) document.webkitExitFullscreen();
+  }
+  function vollbildStart() {
+    if (!code.value.trim()) { alert('Es gibt noch nichts anzuzeigen. Bitte zuerst HTML-Code einfügen.'); return; }
+    if (nativ) {
+      try {
+        const p = (vorschau.requestFullscreen || vorschau.webkitRequestFullscreen).call(vorschau);
+        if (p && p.catch) p.catch(behelf);
+        return;
+      } catch (e) {}
+    }
+    behelf();
+  }
+  function behelf() { document.body.classList.add('vollbild'); fokusInVorschau(); }
+  $('btnVollbild').onclick = () => imVollbild() ? vollbildEnde() : vollbildStart();
+  vbEnde.onclick = vollbildEnde;
+  ['fullscreenchange', 'webkitfullscreenchange'].forEach(ev =>
+    document.addEventListener(ev, () => { if (imVollbild()) fokusInVorschau(); }));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.body.classList.contains('vollbild')) vollbildEnde(); });
   function geaendert() {
     render();
     store.set('html-editor:code', code.value);
