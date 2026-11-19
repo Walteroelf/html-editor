@@ -14,7 +14,7 @@ Kleiner HTML-Editor mit Live-Vorschau für den Unterricht: Code links einfügen 
 
 ## Gestaltung
 
-Wie die anderen Unterrichts-Apps am Erscheinungsbild der Spiele München 1972 (Otl Aicher) orientiert: helle, heitere Farben, flache Flächen, kleine Rundungen, kein Rot und kein Schwarz (Schrift in Dunkelblau). Leseschrift Andika (lokal, siehe `schriften/`).
+Gemeinsames Design der Unterrichts-Apps, angelehnt an die Farben der Spiele München 1972 (Otl Aicher). Die Farben stehen in `design.css`, die Regeln in [DESIGN.md](DESIGN.md). Auf jeder Farbfläche steht dunkelblaue Schrift, kein Rot, kein Schwarz. Leseschrift Andika (lokal, siehe `schriften/`).
 
 ## Benutzen
 
